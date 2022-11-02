@@ -1,5 +1,5 @@
 ---
-title: "An OLS Study on Home Values in Philadelphia"
+title: "Predicting Home Values in Philadelphia Using Spatial Regressions"
 author: "Li, Jie; Wang, Yan; Zhang, Yihan"
 date: "10/2/2022"
 output:
@@ -12,51 +12,18 @@ output:
   pdf_document: default
 ---
 
-
-<style>
-
-p.caption {
-  font-size: 0.8em;
-  text-align: center;
-  font-weight: normal;
-}
-
-caption {
-  color: grey;
-  font-size: 0.8em;
-} 
-
-
-body{
-  font-size: 11pt;
-}
-
-td{
-  font-size: 9pt;
-}
-th{
-  font-size: 0.8em;
-  color: grey;
-}
-
-</style>
+<link rel="stylesheet" href="css/styles.css">
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=TRUE, cache=FALSE, results="hide", message=FALSE, warning=FALSE)
 ```
-
-# 1. Introduction
-
-text
-
-# 2. Data Cleaning
-
 
 ```{r set-up}
 
 # Several libraries and util functions from my GitHub
 source("https://raw.githubusercontent.com/Leejere/r-setup/main/r_setup.r")
 
+# Some other libraries to be used
 library(Hmisc)
 library(rgeoda)
 library(BAMMtools)
@@ -65,6 +32,46 @@ library(car)  #to calculate VIF
 library(MASS)
 library(rsq)
 
+# A 5-scale palette based off of the hero palette color
 palette_blue_5 = list('#ffffff', '#c6c7eb', '#8e8fd7', '#5557c3', '#353797')
+
 ```
 
+
+# 1. Introduction
+
+Some introduction.
+
+Import data
+
+```{r import}
+
+df = st_read("data/Regression Data.shp") %>%
+  st_transform(crs) %>%
+  dplyr::select(bg_id = AREAKEY, # Block Group ID
+                md_housing_value = MEDHVAL, # Median Housing Value (owner-occupied)
+                pct_bachelor = PCTBACHMOR, # Pct of residents w/ bachelor's +
+                pct_vacant = PCTVACANT, # Pct of hs units that are vacant
+                n_poverty = NBelPov100, # Number of hhs below poverty line
+                md_hh_income = MEDHHINC # Median household income
+                )
+
+# Dictionary of variable names to their meaningful names
+var_dct = c("bg_id" = "Block Group ID",
+            "md_housing_value" = "Median Housing Value",
+            "pct_bachelor" = "Pct of Residents w/ Bachelor's Degree +",
+            "pct_vacant" = "Pct of Housing Units Being Vacant",
+            "n_poverty" = "# of Households under Poverty Line",
+            "md_hh_income" = "Median Household Income")
+
+```
+
+# 2. OLS Model and the Spatial Autocorrelation of Residuals
+
+# 3. Spatial Lag Regression
+
+# 4. Spatial Error Regression
+
+# 5. Geographically-Weighted Regression
+
+# 6. Discussion

@@ -40,9 +40,20 @@ palette_blue_5 = list('#ffffff', '#c6c7eb', '#8e8fd7', '#5557c3', '#353797')
 
 # 1. Introduction
 
-Some introduction.
+*Two paragraphs*
 
-Import data
+Problem and setting of the analysis (predicting home prices in Philadelphia).
+
+Refer to the previous document, recap on the model there and state that there is a flow in the OLS model.
+
+Mention the purpose of this report is to use Spatial Lag, Spatial Error and GWR models.
+
+# 2. Methods
+
+## 2.1 Spatial autocorrelation
+
+-   First Law of Geography
+-   
 
 ```{r import}
 

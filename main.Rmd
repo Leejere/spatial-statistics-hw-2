@@ -22,21 +22,7 @@ knitr::opts_chunk$set(echo=TRUE, cache=FALSE, results="hide", message=FALSE, war
 
 # Several libraries and util functions from my GitHub
 source("https://raw.githubusercontent.com/Leejere/r-setup/main/r_setup.r")
-
-# Some other libraries to be used
-library(Hmisc)
-library(rgeoda)
-library(BAMMtools)
-library(DAAG)
-library(car)  #to calculate VIF
-library(MASS)
-library(rsq)
-
-# A 5-scale palette based off of the hero palette color
-palette_blue_5 = list('#ffffff', '#c6c7eb', '#8e8fd7', '#5557c3', '#353797')
-
 ```
-
 
 # 1. Introduction
 
@@ -52,8 +38,99 @@ Mention the purpose of this report is to use Spatial Lag, Spatial Error and GWR 
 
 ## 2.1 Spatial autocorrelation
 
--   First Law of Geography
--   
+> Everything is related to everything else, but near things are more related than distant things.
+
+Such a statement by Waldo Tobler in 1970 is the basic premise behind all spatial statistics. Conventional statistical modeling often requires that the observations are independent from each other. Geographical objects, however, are usually highly correlated with their neighbors. For example, high-income families are more likely to live close to other high-income families, and nearby neighborhoods are more likely to have similar demographics and economics. This phenomenon is called *spatial correlation*, and we need new statistical tools to handle spatially correlated data.
+
+***Moran's I*** **is a measurement of global spatial autocorrelation.** This index essentially measures the weighted mean of the co-variance of each observation with its neighbors against the global variance. This is, the higher the spatial autocorrelation, the higher the co-variances of neighboring observations, and thus the higher Moran's I. At the extreme, if neighboring observations have almost identical values, then the mean co-variance would almost become the variance, and the Moran's I reaches 1. The algorithm for Moran's I is as follows:
+
+$$
+Moran’s \ I=\frac{\frac{\sum_{i=1}^{n}\sum_{j=1}^{n}w_{ij}(X_i-\bar X)(X_j-\bar X)}{\sum_{i=1}^n\sum_{j=1}^nw_{ij}}}{\frac{\sum_{i=1}^n(X_i-\bar X)^2}{n}}
+$$ 
+
+where $\bar X$ is the global mean of the variable $X$, $X_i$ a value $X$ at location $i$, and $X_j$ is the value of $X$ at another location $j$ in relation to $i$. $w_{ij}$ is a weight indexing location $i$ relative to $j$, and $n$ is the number of all observations. In the nominator of the above equation, we calculated the weighted mean of of the covariance of each observed value $X_i$ with each of its neighbor $X_j$. The denominator is the global variance of $X$.
+
+The weights of proximity are determined using different methods, e.g., by distance, or, for polygons, by weight matrices. The Rook matrix deems those polygons sharing a boundary segment as neighbors, whereas the others are non-neighbors. By the Queen matrix, on the other hand, a shared point will already suffice for neighborship. Typically, statisticians would try different weight matrices to ensure that the results are not merely the artifact of the matrix being used.
+
+**Testing the significance of Moran's I.** To test the significance of Moran's I, we need to do a hypothesis testing, where the null hypothesis is that no spatial autocorrelation exists, as opposed to the alternative hypothesis that there is significant spatial autocorrelation. First, we need to identify what the Moran's I would be if there were no spatial autocorrelation. To do that, we calculate hypothetical Moran's Is after randomly "shuffling" the values attached to the geographies. Once we do this enough times (e.g., 999 permutations), by plotting a histogram of the hypothetical Moran's Is, we can approximate the distribution of Moran's I under no spatial autocorrelation, which is supposedly normal. Then, we can estimate the probability (or p-value) of acquiring the actual Moran's I value were there no spatial autocorrelation. By convention, if the p-value is smaller than 0.05, then we reject the null hypothesis for the alternative hypothesis, stating that there is significant spatial autocorrelation.
+
+**Local spatial autocorrelation.** As opposed the *global* Moran's I, the local index for spatial autocorrelation (LISA) measures the degree of spatial autocorrelation for each location. It measures how a particular value $X_i$ co-varies with its neighbors $X_j$ against the global variance. A greater positive value of LISA indicate the clustering of similar values near location $i$, whereas a negative value implies that location $i$ is an outlier in its milieu.
+
+## 2.2 Review of OLS Regression and Assumptions
+
+An Ordinary Least Square regression aims to construct a linear model that minimized the sum of squared residuals. This regression requires that the following assumptions hold true: Linear relationships between the dependent variable and the predictors, normal distribution and homoscedasticity of residuals, independence of observation and residuals, and non-collinearity between the predictors (if multiple regression).
+
+In our case, on the other hand, the assumption of independent observations and residuals no longer holds due to spatial autocorrelation. We can test this assumption by examining the Moran's I for the residuals after running an OLS model. Another way to test this assumption is to regress each residual on the average of nearby residuals (or "lagged residuals", "nearby" being defined by the Queen matrix). The coefficient of lagged residuals from this regression is known as $\lambda$ or $\rho$. It is also the slope rate of the residual-by-lagged-residual plot.
+
+Other assumptions required in an OLS regression can be tested.
+
+-   Homoscedasticity. We may use the Breusch-Pagan Test, the Koenker-Bassett Test, or the White Test, to test for homoscedasticity. The null hypothesis is that of homoscedasticity. If the p-value is smaller than 0.05, we reject the null hypothesis for the alternative hypothesis of heteroscedasticity.
+
+-   Normality of residuals. We may use the Jarque-Bera Test to test for normality residual. Again, the null hypothesis is that of normality of residuals. If the p-value goes lower than 0.05, then we reject the null hypothesis for the alternative hypothesis of non-normality.
+
+## 2.3 Spatial Lag and Spatial Error Regression
+
+In this section, we present the models for the spatial lag and spatial error regressions.
+
+**The spatial lag model** is a linear model that takes in the lagged $y$ (dependent variable) as an additional predictor. Here, the spatial lag model is built off of the model in the previous assignment and is written as follows:
+
+$$
+md\_housing\_value = \rho W_{md\_housing\_value}+\beta_0+\beta_1\cdot log\_n\_poverty+\beta_2\cdot pct\_bachelor+\beta_3\cdot pct\_single + \beta_4\cdot pct\_vacant+\epsilon
+$$ 
+where $W_{md\_housing\_value}$ is the lagged value of $md\_housing\_value$. For each observation, the lagged value is the weighted mean of the values at the neighboring locations. "Neighboring locations" are determined by a weights matrix. $\rho$ is the coefficient of this lagged variable. Holding all other variables constant, as $W_{md\_housing\_value}$ changes by one unit, the dependent variable will changes by $\rho$ units. Note that here $\rho$ is constrained between -1 and 1.
+
+The other variables here are number of households under the poverty line (logged), percentage of residents of with a bachelor's degree or higher, percentage of housing units that are single-family detached, and the percentage of housing units that are vacant. $\beta_1$ to $\beta_4$ are the coefficients of these variables, and $\beta_0$ here is the intercept. Readers may refer to the first assignment for detailed interpretations of these terms. Finally, the $\epsilon$ here stands for the residual, or the difference between the predicted and observed values of the dependent variable.
+
+**The spatial error regression** functions similarly to the spatial lag regression, except for that the term of lagged dependent variable is replaced by lagged residuals $W_\epsilon$. Running a spatial error regression requires a two-step process.
+
+-   Step 1: we run a regular OLS regression without the lagged term. Then, we calculate the residual of each observation.
+-   Step 2: we determine how much of the residuals are "spatial". To do this, we regress the residuals on their nearest neighboring residuals and get $\lambda$. With this, we construct the spatial error model by adding the term of $\lambda W_\epsilon$. The model is written as follows:
+
+$$
+
+md\_housing\_value = \rho W\_\epsilon+\beta\_0+\beta_1\cdot log\_n\_poverty+\beta_2\cdot pct\_bachelor+\beta_3\cdot pct\_single + \beta_4\cdot pct\_vacant+\epsilon
+
+$$ 
+
+It should be noted that the assumptions needed for the OLS model are still needed for both the spatial lag and spatial error models, except, of course, for the spatial independence of observations. The goal of the spatial lag and spatial error models is to address the possible spatial dependencies nested in the dataset. We expect that the residuals become no longer spatially auto-correlated and less heteroscedastic after taking the lagged terms into account.
+
+After running the spatial lag or spatial error regressions, **model selection** should be performed, which determines whether the spatial lag or spatial error regressions perform better than the OLS regression that the former are based on. We may use the following criteria:
+
+-   **Akaike Information Criterion or Schwarz Criterion**. These are measures of the goodness of fit of nested models (where one model is based on the other with a different component or complexity). They measure the information that gets lost when a certain model is used, and therefore describes the "trade-off" between the model's precision and complexity.
+
+-   **Log likelihood** calculate the likelihood of the dataset, given the model parameters. The higher the likelihood, the better the model fits the data. As with the above item, the log likelihood method is also used only with nested models.
+
+-   **Likelihood Ratio Test** compares the spatial model with the non-spatial OLS model. The null hypothesis is that the spatial model is not better than the non-spatial one. If the p-value is smaller than 0.05, then we may reject the null hypothesis for the alternative hypothesis that the spatial model is better than the non-spatial one given the data.
+
+Another way to compare the models is by checking the Moran's I of the regression residuals. The residuals from the spatial models are expected to have very low spatial depencency, which is an indicator that the spatial models fit the data better.
+
+## 2.4 Geographically Weighted Regression
+
+The **Simpson's Paradox** describes a situation where the modeled relationship between variables may not remain constant; that is, for a selection of observations, the relationship may be different from the one modeled from all the observations. Although the spatial lag and spatial error regression have addressed the problem with spatial dependencies, they still assume **spatial stationarity**, meaning the modeled relationship remains constant across space. It might be beneficial to have **different models** for different spatial locations, i.e., **local regressions**. This process of constructing local regressions for different locations in space is called the **geographically weighted regression (GWR)**.
+
+The equation for the GWR model is written for each observation $i$:
+
+$$
+
+md\_housing\_value_i = \beta_{i0}+\beta{i1}\cdot log\_n\_poverty_i+\beta_{i2}\cdot pct\_bachelor_i+\beta_{i3}\cdot pct\_single_i+\beta_{i4}\cdot pct\_vacant_i+\epsilon_i
+
+$$
+
+To get such an equation for each observation, we run a **local regression**, which takes the observations near location $i$ and run an OLS regression model. The observations entering into local regressions are weighted, and the weights are determined by **weighing function** or **kernel**. On the other hand, a local regression takes observations only within a certain **bandwidth** or distance, beyond which all other observations have a weight of zero.
+
+There are two ways to determine the bandwidth.
+
+-   **Fixed bandwidth.** A circle of radius $h$ is drawn around observation $i$. The location regression for location $i$ takes observations only within $h$ distance.
+
+-   **Adaptive bandwidth.** A fixed number of nearest neighbors are selected for each local regression, and thus the bandwidth $h$ is adaptive.
+
+Fixed bandwidth is more appropriate when the spatial distribution of the observations are even. Otherwise, the number of observations entering into each local regression may vary greatly. For the sparse places, too few observations enter the local regressions; whereas for the dense places, too many observations enter local regressions that they may no longer be “local” enough. In our case, as block group sizes vary across Philadelphia, we chose to use the adaptive bandwidth.
+
+The assumptions required for a regular OLS regression are still required for the GWR model, including normality of residuals, homoscedasticity, and non-collinearity of predictors. The assumption for non-multicollinearity is worth noting here. As the GWR model builds a local regression for each location, we may run into issues when the values of one of the predictors cluster in space. In that case, this predictor no longer will provide little explanation power in the clustering places. In the same way, we may run into issues when two or more predictors have similar patterns of clusters, which may produce unstable or unreliable results. In R, the **condition number** indicates when a local regression has issues with multicollinearity and therefore may have unreliable coefficients. Conventionally, we do not trust results for local regressions with a condition number greater than 30 or equal to null.
+
+Unlike with OLS regressions, p-values are not part of the GWR output. This is a problem with multiple testing. If the p-value is $\alpha$, it means that under the null hypothesis, there is an $\alpha$ probability that we observe the result by pure chance. If $\alpha$ is reasonably small, then we can reject the null hypothesis. However, this rejection may be the type II error in which we deem something to be significant when it is actually not; after all, even if something is not significant, there is still an $\alpha$ probability of us rejecting the null hypothesis. The problem arises with multiple testing because as the number of tests go up, it becomes almost inevitable to make type II errors, and thus the basic premises of p-value reporting (rejecting the null hypothesis assuming type II errors are not likely) no longer holds. In the GWR model, each predictor in each local regression requires testing. Therefore, we do not usually report p-values in the GWR model.
+
+# 3. Results
 
 ```{r import}
 
@@ -64,7 +141,8 @@ df = st_read("data/Regression Data.shp") %>%
                 pct_bachelor = PCTBACHMOR, # Pct of residents w/ bachelor's +
                 pct_vacant = PCTVACANT, # Pct of hs units that are vacant
                 n_poverty = NBelPov100, # Number of hhs below poverty line
-                md_hh_income = MEDHHINC # Median household income
+                md_hh_income = MEDHHINC, # Median household income
+                pct_single = PCTSINGLES # Pct of hs units that are single-family detached
                 )
 
 # Dictionary of variable names to their meaningful names
@@ -73,16 +151,9 @@ var_dct = c("bg_id" = "Block Group ID",
             "pct_bachelor" = "Pct of Residents w/ Bachelor's Degree +",
             "pct_vacant" = "Pct of Housing Units Being Vacant",
             "n_poverty" = "# of Households under Poverty Line",
-            "md_hh_income" = "Median Household Income")
+            "md_hh_income" = "Median Household Income",
+            "pct_single" = "Pct of Housing Unites Single Family Detached")
 
 ```
 
-# 2. OLS Model and the Spatial Autocorrelation of Residuals
-
-# 3. Spatial Lag Regression
-
-# 4. Spatial Error Regression
-
-# 5. Geographically-Weighted Regression
-
-# 6. Discussion
+# 4. Discussion

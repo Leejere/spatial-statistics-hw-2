@@ -22,6 +22,8 @@ knitr::opts_chunk$set(echo=TRUE, cache=FALSE, results="hide", message=FALSE, war
 
 # Several libraries and util functions from my GitHub
 source("https://raw.githubusercontent.com/Leejere/r-setup/main/r_setup.r")
+
+library(tmap)
 ```
 
 # 1. Introduction
@@ -46,7 +48,7 @@ Such a statement by Waldo Tobler in 1970 is the basic premise behind all spatial
 
 $$
 Moran’s \ I=\frac{\frac{\sum_{i=1}^{n}\sum_{j=1}^{n}w_{ij}(X_i-\bar X)(X_j-\bar X)}{\sum_{i=1}^n\sum_{j=1}^nw_{ij}}}{\frac{\sum_{i=1}^n(X_i-\bar X)^2}{n}}
-$$ 
+$$
 
 where $\bar X$ is the global mean of the variable $X$, $X_i$ a value $X$ at location $i$, and $X_j$ is the value of $X$ at another location $j$ in relation to $i$. $w_{ij}$ is a weight indexing location $i$ relative to $j$, and $n$ is the number of all observations. In the nominator of the above equation, we calculated the weighted mean of of the covariance of each observed value $X_i$ with each of its neighbor $X_j$. The denominator is the global variance of $X$.
 
@@ -76,8 +78,7 @@ In this section, we present the models for the spatial lag and spatial error reg
 
 $$
 md\_housing\_value = \rho W_{md\_housing\_value}+\beta_0+\beta_1\cdot log\_n\_poverty+\beta_2\cdot pct\_bachelor+\beta_3\cdot pct\_single + \beta_4\cdot pct\_vacant+\epsilon
-$$ 
-where $W_{md\_housing\_value}$ is the lagged value of $md\_housing\_value$. For each observation, the lagged value is the weighted mean of the values at the neighboring locations. "Neighboring locations" are determined by a weights matrix. $\rho$ is the coefficient of this lagged variable. Holding all other variables constant, as $W_{md\_housing\_value}$ changes by one unit, the dependent variable will changes by $\rho$ units. Note that here $\rho$ is constrained between -1 and 1.
+$$ where $W_{md\_housing\_value}$ is the lagged value of $md\_housing\_value$. For each observation, the lagged value is the weighted mean of the values at the neighboring locations. "Neighboring locations" are determined by a weights matrix. $\rho$ is the coefficient of this lagged variable. Holding all other variables constant, as $W_{md\_housing\_value}$ changes by one unit, the dependent variable will changes by $\rho$ units. Note that here $\rho$ is constrained between -1 and 1.
 
 The other variables here are number of households under the poverty line (logged), percentage of residents of with a bachelor's degree or higher, percentage of housing units that are single-family detached, and the percentage of housing units that are vacant. $\beta_1$ to $\beta_4$ are the coefficients of these variables, and $\beta_0$ here is the intercept. Readers may refer to the first assignment for detailed interpretations of these terms. Finally, the $\epsilon$ here stands for the residual, or the difference between the predicted and observed values of the dependent variable.
 
@@ -86,11 +87,11 @@ The other variables here are number of households under the poverty line (logged
 -   Step 1: we run a regular OLS regression without the lagged term. Then, we calculate the residual of each observation.
 -   Step 2: we determine how much of the residuals are "spatial". To do this, we regress the residuals on their nearest neighboring residuals and get $\lambda$. With this, we construct the spatial error model by adding the term of $\lambda W_\epsilon$. The model is written as follows:
 
-$$
+\$\$
 
-md\_housing\_value = \rho W\_\epsilon+\beta\_0+\beta_1\cdot log\_n\_poverty+\beta_2\cdot pct\_bachelor+\beta_3\cdot pct\_single + \beta_4\cdot pct\_vacant+\epsilon
+md_housing_value = \rho W\_\epsilon+\beta\_0+\beta\_1\cdot log_n\_poverty+\beta\_2\cdot pct_bachelor+\beta\_3\cdot pct_single + \beta\_4\cdot pct_vacant+\epsilon
 
-$$ 
+\$\$
 
 It should be noted that the assumptions needed for the OLS model are still needed for both the spatial lag and spatial error models, except, of course, for the spatial independence of observations. The goal of the spatial lag and spatial error models is to address the possible spatial dependencies nested in the dataset. We expect that the residuals become no longer spatially auto-correlated and less heteroscedastic after taking the lagged terms into account.
 
@@ -112,7 +113,7 @@ The equation for the GWR model is written for each observation $i$:
 
 $$
 
-md\_housing\_value_i = \beta_{i0}+\beta{i1}\cdot log\_n\_poverty_i+\beta_{i2}\cdot pct\_bachelor_i+\beta_{i3}\cdot pct\_single_i+\beta_{i4}\cdot pct\_vacant_i+\epsilon_i
+md_housing_value_i = \beta*{i0}+*\beta{i1}\cdot log_n\_poverty_i+\beta{i2}\cdot pct_bachelor_i+\beta*{i3}*\cdot pct_single_i+\beta{i4}\cdot pct_vacant_i+\epsilon\_i
 
 $$
 
@@ -124,7 +125,7 @@ There are two ways to determine the bandwidth.
 
 -   **Adaptive bandwidth.** A fixed number of nearest neighbors are selected for each local regression, and thus the bandwidth $h$ is adaptive.
 
-Fixed bandwidth is more appropriate when the spatial distribution of the observations are even. Otherwise, the number of observations entering into each local regression may vary greatly. For the sparse places, too few observations enter the local regressions; whereas for the dense places, too many observations enter local regressions that they may no longer be “local” enough. In our case, as block group sizes vary across Philadelphia, we chose to use the adaptive bandwidth.
+Fixed bandwidth is more appropriate when the spatial distribution of the observations are even. Otherwise, the number of observations entering into each local regression may vary greatly. For the sparse places, too few observations enter the local regressions; whereas for the dense places, too many observations enter local regressions that they may no longer be "local" enough. In our case, as block group sizes vary across Philadelphia, we chose to use the adaptive bandwidth.
 
 The assumptions required for a regular OLS regression are still required for the GWR model, including normality of residuals, homoscedasticity, and non-collinearity of predictors. The assumption for non-multicollinearity is worth noting here. As the GWR model builds a local regression for each location, we may run into issues when the values of one of the predictors cluster in space. In that case, this predictor no longer will provide little explanation power in the clustering places. In the same way, we may run into issues when two or more predictors have similar patterns of clusters, which may produce unstable or unreliable results. In R, the **condition number** indicates when a local regression has issues with multicollinearity and therefore may have unreliable coefficients. Conventionally, we do not trust results for local regressions with a condition number greater than 30 or equal to null.
 
@@ -155,5 +156,133 @@ var_dct = c("bg_id" = "Block Group ID",
             "pct_single" = "Pct of Housing Unites Single Family Detached")
 
 ```
+
+```{r log_transformation, message=FALSE}
+
+df <- df %>% 
+  mutate(n_poverty_log = log(n_poverty + 1))
+
+# var_dct <- 
+#   var_dct %>% add("n_poverty_log" = "Logged # of Households under Poverty Line")
+
+```
+
+## 3.1 Spatial Correlation Exploration through Global and Local Moran's I
+
+- plot continuous queen neighbors unfinished
+
+```{r queen_neighbors}
+
+# create the queen weight dataframe
+queen<-poly2nb(df , row.names=df$bg_id)
+summary(queen)
+
+# plot continuous queen neighbors
+plot(df %>% dplyr::select(bg_id), col='grey90', lwd=2)
+xy<-coordinates(as_Spatial(df))
+par(mfrow=c(1,1)) 
+plot(queen, xy, col='red', lwd=10, add=TRUE)
+title(main='Contiguous Queen Neighbors')
+
+
+#see which region has only one neighbor
+smallestnbcard<-card(queen) #extract neighbor matrix
+smallestnb<-which(smallestnbcard == min(smallestnbcard)) #extract block groups with smallest number of neighbors
+fg<-rep('grey90', length(smallestnbcard))
+fg[smallestnb]<-'red' #color block groups red
+fg[queen[[smallestnb[1]]]]<-'green' #color neighboring blocks green
+fg[queen[[smallestnb[2]]]]<-'green'
+fg[queen[[smallestnb[3]]]]<-'green'
+fg[queen[[smallestnb[4]]]]<-'green'
+plot(df %>% dplyr::select(bg_id), col=fg)
+title(main='Regions with only 1 neighbor')
+
+#see which region has most neighbors
+largestnbcard<-card(queen)
+largestnb<-which(largestnbcard == max(largestnbcard))
+fg1<-rep('grey90', length(largestnbcard))
+fg1[largestnb]<-'red'
+fg1[queen[[largestnb]]]<-'green'
+plot(df %>% dplyr::select(bg_id), col=fg1)
+title(main='Region with 27 neighbors')
+
+```
+Global Moran's I is 0.6814 - which suggests a strong spatial correlation
+
+```{r global_morans}
+
+# calculate Global Moran'I
+queenlist<-nb2listw(queen, style = 'W')
+moran(df$md_housing_value, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I` 
+
+# Then check to see whether the Moran’s I value issignificant (using 999 permutations). Take a screenshot of your results to presentin your report (Moran’s I value for the sample, histogram of Moran’s I values forthe permutations, and the p-value that you obtain will need to be included).
+
+moranMC<-moran.mc(df$md_housing_value, queenlist, nsim=999, alternative="two.sided")  #We use 999 permutations
+moranMC
+
+moranMCres<-moranMC$res
+hist(moranMCres, freq=10000000, nclass=100)   #Draws distribution of Moran's I's calculated from randomly permuted values
+# Here, we draw a red vertical line at the observed value of our Moran's I
+abline(v=moran(df$md_housing_value, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I`, col='red')  
+
+#Create Moran plot (lagged value against observed value)
+moran.plot(df$md_housing_value, queenlist) 
+```
+
+```{r local_morans, message=FALSE}
+
+#Run local moran's I (LISA) 
+LISA<-localmoran(df$md_housing_value, queenlist)
+head(LISA)
+
+df.LISA <-cbind(df, as.data.frame(LISA))
+
+# map the p-value districution
+moranSig.plot<-function(df,listw, title){
+  local<-localmoran(x=df$md_housing_value, listw=listw, zero.policy = FALSE)
+  moran.map<-cbind(df, local)
+  #Here, col='Pr.z....E.Ii..' is the name of the column in the dataframe df.LISA that we're trying to plot. This variable name might change based on the version of the package.
+  tm<-tm_shape(moran.map)+
+    tm_borders(col='white')+
+    tm_fill(style='fixed', col='Pr.z....E.Ii..', breaks=c(0,0.001, 0.01, 0.05, 1), title= 'p-value', palette = '-BuPu')+
+    tm_layout(frame = FALSE, title = title)
+  print(tm)
+}
+moranSig.plot(df.LISA, queenlist, 'p-value')
+
+
+# categorized p-value map
+hl.plot<-function(df, listw){
+  local<-localmoran(x=df$md_housing_value, listw=listw, zero.policy = FALSE)
+  quadrant<-vector(mode='numeric', length=323)
+  m.prop<-df$md_housing_value - mean(df$md_housing_value)
+  m.local<-local[,1]-mean(local[,1])
+  signif<-0.05
+  quadrant[m.prop >0 & m.local>0]<-4 #high md_housing_value, high clustering
+  quadrant[m.prop <0 & m.local<0]<-1 #low md_housing_value, low clustering
+  quadrant[m.prop <0 & m.local>0]<-2 #low md_housing_value, high clustering
+  quadrant[m.prop >0 & m.local<0]<-3 #high md_housing_value, low clustering
+  quadrant[local[,5]>signif]<-0
+  
+  brks <- c(0,1,2,3,4)
+  colors <- c("grey","light blue",'blue','pink',"red")
+  plot<-plot(df %>% dplyr::select(bg_id),border="gray90",lwd=1.0,col=colors[findInterval(quadrant,brks,all.inside=FALSE)])
+}
+
+hl.plot(df, queenlist)
+legend("bottomright",legend=c("insignificant","low-high","low-low","high-low","high-high"),
+       fill=c("grey", "light blue", "blue", "pink", "red"),bty="n", cex = 0.5)
+
+```
+
+## 3.2 OLS Regression
+
+
+## 3.3 Spatial Lag and Spatial Error Regression Results
+
+
+## 3.4 Geographically Weighted Regression (GWR)
+
+
 
 # 4. Discussion

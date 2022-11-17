@@ -135,37 +135,33 @@ Unlike with OLS regressions, p-values are not part of the GWR output. This is a 
 
 ```{r import}
 
-df = st_read("data/Regression Data.shp") %>%
+df <-  st_read("data/Regression Data.shp") %>%
   st_transform(crs) %>%
   dplyr::select(bg_id = AREAKEY, # Block Group ID
-                md_housing_value = MEDHVAL, # Median Housing Value (owner-occupied)
+                md_housing_value = MEDHVAL, 
+                md_housing_value_log = LNMEDHVAL,# Median Housing Value (owner-occupied)
                 pct_bachelor = PCTBACHMOR, # Pct of residents w/ bachelor's +
                 pct_vacant = PCTVACANT, # Pct of hs units that are vacant
                 n_poverty = NBelPov100, # Number of hhs below poverty line
                 md_hh_income = MEDHHINC, # Median household income
                 pct_single = PCTSINGLES # Pct of hs units that are single-family detached
-                )
+                ) %>% 
+  mutate(n_poverty_log = log(n_poverty + 1))
 
 # Dictionary of variable names to their meaningful names
-var_dct = c("bg_id" = "Block Group ID",
+var_dict = c("bg_id" = "Block Group ID",
             "md_housing_value" = "Median Housing Value",
+            "md_housing_value_log" = "Logged Median Housing Value",
             "pct_bachelor" = "Pct of Residents w/ Bachelor's Degree +",
             "pct_vacant" = "Pct of Housing Units Being Vacant",
             "n_poverty" = "# of Households under Poverty Line",
             "md_hh_income" = "Median Household Income",
-            "pct_single" = "Pct of Housing Unites Single Family Detached")
+            "pct_single" = "Pct of Housing Unites Single Family Detached",
+            "n_poverty_log" = "Logged number of Households under Poverty Line")
 
 ```
 
-```{r log_transformation, message=FALSE}
 
-df <- df %>% 
-  mutate(n_poverty_log = log(n_poverty + 1))
-
-# var_dct <- 
-#   var_dct %>% add("n_poverty_log" = "Logged # of Households under Poverty Line")
-
-```
 
 ## 3.1 Spatial Correlation Exploration through Global and Local Moran's I
 
@@ -283,6 +279,152 @@ legend("bottomright",legend=c("insignificant","low-high","low-low","high-low","h
 
 ## 3.4 Geographically Weighted Regression (GWR)
 
+```{r gwr_bandwidth}
 
+library(spgwr)
+
+#Setting an adaptive bandwidth
+bw<-gwr.sel(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant, 
+            data=as_Spatial(df),
+            method = "aic",
+            adapt = TRUE)
+
+bw
+
+# create a fixed bandwidth
+bw_fixed<-gwr.sel(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant,  
+            data=as_Spatial(df),
+            method = "aic",
+            adapt = FALSE)
+
+bw_fixed
+
+```
+
+```{r gwr_model}
+
+# gwr model with adpative bandwidth
+gwrmodel<-gwr(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant,
+              data= as_Spatial(df),
+              adapt = bw, #adaptive bandwidth determined by proportion of observations accounted for
+              gweight=gwr.Gauss,
+              se.fit=TRUE, #to return local standard errors
+              hatmatrix = TRUE)
+gwrmodel
+
+
+# gwr model with fixed bandwidth
+gwrmodel_fixed<-gwr(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant,
+              data= as_Spatial(df),
+              adapt = bw_fixed, #adaptive bandwidth determined by proportion of observations accounted for
+              gweight=gwr.Gauss,
+              se.fit=TRUE, #to return local standard errors
+              hatmatrix = TRUE)
+gwrmodel_fixed
+
+```
+
+```{r gwr_adpative_summary}
+
+summary(gwrmodel$SDF)
+
+```
+
+```{r gwr_mapping}
+
+gwrresults<-as.data.frame(gwrmodel$SDF)
+
+df <- df %>% 
+  mutate(coef_n_poverty_log_st = gwrresults$n_poverty_log/gwrresults$n_poverty_log_se,
+         coef_pct_vacant_st = gwrresults$pct_vacant / gwrresults$pct_vacant_se,
+         coef_pct_bachelor_st = gwrresults$pct_bachelor / gwrresults$pct_bachelor_se,
+         coef_pct_single_st = gwrresults$pct_single/gwrresults$pct_single_se,
+         gwrE = gwrresults$gwr.e,
+         localR2 = gwrresults$localR2)
+
+# plotting
+coef_n_poverty_log<-tm_shape(df)+
+  tm_fill(col='coef_n_poverty_log_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of n_poverty_log', 
+          palette ='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Number of Poverty (Log)')
+
+coef_pct_vacant<-tm_shape(df)+
+  tm_fill(col='coef_pct_vacant_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of pct_vacant', 
+          palette='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percentage of Housing Vacant')
+
+coef_pct_bachelor<-tm_shape(df)+
+  tm_fill(col='coef_pct_bachelor_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of pct_bachelor', 
+          palette ='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percentage of bachelor degree or more')
+
+coef_pct_single<-tm_shape(df)+
+  tm_fill(col='coef_pct_single_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of pct_single', 
+          palette ='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percentage of single family housing')
+
+plot_list <-  list(coef_n_poverty_log, coef_pct_bachelor, coef_pct_single, coef_pct_vacant)
+
+tmap_arrange(plot_list,  ncol=2)
+
+```
+
+```{r gwr_ggplot}
+
+# All the variables for the maps
+choropleth_var_list = c("coef_n_poverty_log_st", "coef_pct_vacant_st", "coef_pct_single_st",
+                        "coef_pct_bachelor_st")
+
+# # Create a list of the real names
+# choropleth_name_list = c()
+# for(var in choropleth_var_list){
+#   if(substring(var, nchar(var) - 6, nchar(var)) == "_log_st"){
+#     choropleth_name_list = c(choropleth_name_list, 
+#                              paste0("Log ",
+#                                     var_dict[substring(var, 1, nchar(var) - 4)]))
+#   } else {
+#     choropleth_name_list = c(choropleth_name_list, 
+#                              paste0(var_dict[var]))
+#   }
+# }
+
+choropleth_name_list <- c()
+for (var in choropleth_var_list) {
+  var_short <- gsub("coef_", "", var)
+  var_short <- gsub("_st","", var_short)
+  choropleth_name_list = c(choropleth_name_list, paste0(var_dict[var_short]))
+}
+
+# Initialize map list
+map_list <-  list()
+
+# Make a long table
+df_long <-  df %>%
+  dplyr::select(bg_id, choropleth_var_list) %>%
+  gather("Legend", "Value", -bg_id, -geometry)
+
+# Make the plots
+for(i in seq(1,length(choropleth_var_list))){
+  var = choropleth_var_list[i]
+  this_sf = df_long %>% filter(., Legend == var)
+  map_list[[var]] = 
+    ggplot(this_sf) +
+    geom_sf(aes(fill = Value), color = NA) +
+    scale_fill_continuous(type = "viridis",
+                      #labels = to_jenks_labels(this_df$Value, 5),
+                      breaks = c(-6, -4, -2, 0, 2, 4, 6),
+                      name = "") +
+    labs(title = choropleth_name_list[i]) +
+    map_theme(title_size = 9, tick_size = 7) +
+    theme(legend.position = c(0.8, 0.25))
+}
+
+do.call(grid.arrange, c(map_list, ncol = 2, top = "Choropleth Maps"))
+
+```
 
 # 4. Discussion

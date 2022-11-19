@@ -22,6 +22,8 @@ knitr::opts_chunk$set(echo=TRUE, cache=FALSE, results="hide", message=FALSE, war
 
 # Several libraries and util functions from my GitHub
 source("https://raw.githubusercontent.com/Leejere/r-setup/main/r_setup.r")
+
+library(tmap)
 ```
 
 # 1. Introduction
@@ -40,19 +42,19 @@ Mention the purpose of this report is to use Spatial Lag, Spatial Error and GWR 
 
 > Everything is related to everything else, but near things are more related than distant things.
 
-Such a statement by Waldo Tobler in 1970 is the basic premise behind all spatial statistics. Conventional statistical modeling often requires that the observations are independent from each other. Geographical objects, however, are usually highly correlated with their neighbors. For example, high-income families are more likely to live close to other high-income families, and nearby neighborhoods are more likely to have similar demographics and economics. This phenomenon is called *spatial correlation*, and we need new statistical tools to handle spatially correlated data.
+Such a statement by Waldo Tobler in 1970 is the basic premise behind all spatial statistics. Conventional statistical modeling often requires that the observations are independent from each other. Geographical objects, however, are usually inherently correlated with their neighbors. For example, high-income families are more likely to live close to other high-income families, and nearby neighborhoods are more likely to have similar demographics and economics. This phenomenon is called *spatial autocorrelation*, and we need new statistical tools to handle spatially correlated data.
 
-***Moran's I*** **is a measurement of global spatial autocorrelation.** This index essentially measures the weighted mean of the co-variance of each observation with its neighbors against the global variance. This is, the higher the spatial autocorrelation, the higher the co-variances of neighboring observations, and thus the higher Moran's I. At the extreme, if neighboring observations have almost identical values, then the mean co-variance would almost become the variance, and the Moran's I reaches 1. The algorithm for Moran's I is as follows:
+***Moran's I*** **is a measurement of global spatial autocorrelation.** The algorithm for Moran's I is written as follows. This index essentially measures the weighted mean of the co-variance of geographically *neighboring* observations against the *global* variance. This is, the higher the spatial autocorrelation, the higher the co-variances of neighboring observations, and thus the higher Moran's I. At the extreme, if neighboring observations have almost identical values, then the mean co-variance would almost become the variance, and the Moran's I reaches 1.
 
 $$
 Moran’s \ I=\frac{\frac{\sum_{i=1}^{n}\sum_{j=1}^{n}w_{ij}(X_i-\bar X)(X_j-\bar X)}{\sum_{i=1}^n\sum_{j=1}^nw_{ij}}}{\frac{\sum_{i=1}^n(X_i-\bar X)^2}{n}}
-$$ 
+$$
 
-where $\bar X$ is the global mean of the variable $X$, $X_i$ a value $X$ at location $i$, and $X_j$ is the value of $X$ at another location $j$ in relation to $i$. $w_{ij}$ is a weight indexing location $i$ relative to $j$, and $n$ is the number of all observations. In the nominator of the above equation, we calculated the weighted mean of of the covariance of each observed value $X_i$ with each of its neighbor $X_j$. The denominator is the global variance of $X$.
+In the above equation, $\bar X$ is the global mean of the variable $X$, $X_i$ a value of $X$ at location $i$, and $X_j$ is the value of $X$ at another location $j$ in relation to $i$. $w_{ij}$ is a weight indexing location $i$ relative to $j$, and $n$ is the number of observations. In the nominator of the above equation, we calculated the weighted mean of of the covariance of each observed value $X_i$ with each of its neighbor $X_j$. The denominator is the global variance of $X$.
 
-The weights of proximity are determined using different methods, e.g., by distance, or, for polygons, by weight matrices. The Rook matrix deems those polygons sharing a boundary segment as neighbors, whereas the others are non-neighbors. By the Queen matrix, on the other hand, a shared point will already suffice for neighborship. Typically, statisticians would try different weight matrices to ensure that the results are not merely the artifact of the matrix being used.
+The weights of proximity are determined using different methods, e.g., by distance, or, for polygons, by weight matrices. The Rook matrix deems those polygons sharing a boundary segment as neighbors, whereas the others are non-neighbors. By the Queen matrix, on the other hand, a shared point will already suffice for neighbor-ship. Typically, statisticians would try different weight matrices to ensure that the results are not merely the artifact of the matrix being used.
 
-**Testing the significance of Moran's I.** To test the significance of Moran's I, we need to do a hypothesis testing, where the null hypothesis is that no spatial autocorrelation exists, as opposed to the alternative hypothesis that there is significant spatial autocorrelation. First, we need to identify what the Moran's I would be if there were no spatial autocorrelation. To do that, we calculate hypothetical Moran's Is after randomly "shuffling" the values attached to the geographies. Once we do this enough times (e.g., 999 permutations), by plotting a histogram of the hypothetical Moran's Is, we can approximate the distribution of Moran's I under no spatial autocorrelation, which is supposedly normal. Then, we can estimate the probability (or p-value) of acquiring the actual Moran's I value were there no spatial autocorrelation. By convention, if the p-value is smaller than 0.05, then we reject the null hypothesis for the alternative hypothesis, stating that there is significant spatial autocorrelation.
+**Testing the significance of Moran's I.** What value of Moran’s I indicates spatial autocorrelation? To test the significance of Moran's I, we need to do a hypothesis testing, where the null hypothesis is that no spatial autocorrelation exists, as opposed to the alternative hypothesis that there is significant spatial autocorrelation. First, we need to identify what the Moran's I would be if there were no spatial autocorrelation. To do that, we calculate a hypothetical Moran’s I after randomly "shuffling" the values attached to the geographies - an action attempting to erase any spatial autocorrelation that may exist. Once we do this enough times (e.g., 999 permutations), by plotting a histogram of the hypothetical Moran’s Is obtained, we can approximate the probability distribution of Moran’s I given no spatial autocorrelation, which is supposedly normal. Then, we can estimate the probability (p-value) of acquiring the actual Moran's I value were there no spatial autocorrelation. By convention, if the p-value is smaller than 0.05, then we reject the null hypothesis for the alternative hypothesis, stating that there is significant spatial autocorrelation.
 
 **Local spatial autocorrelation.** As opposed the *global* Moran's I, the local index for spatial autocorrelation (LISA) measures the degree of spatial autocorrelation for each location. It measures how a particular value $X_i$ co-varies with its neighbors $X_j$ against the global variance. A greater positive value of LISA indicate the clustering of similar values near location $i$, whereas a negative value implies that location $i$ is an outlier in its milieu.
 
@@ -60,9 +62,9 @@ The weights of proximity are determined using different methods, e.g., by distan
 
 An Ordinary Least Square regression aims to construct a linear model that minimized the sum of squared residuals. This regression requires that the following assumptions hold true: Linear relationships between the dependent variable and the predictors, normal distribution and homoscedasticity of residuals, independence of observation and residuals, and non-collinearity between the predictors (if multiple regression).
 
-In our case, on the other hand, the assumption of independent observations and residuals no longer holds due to spatial autocorrelation. We can test this assumption by examining the Moran's I for the residuals after running an OLS model. Another way to test this assumption is to regress each residual on the average of nearby residuals (or "lagged residuals", "nearby" being defined by the Queen matrix). The coefficient of lagged residuals from this regression is known as $\lambda$ or $\rho$. It is also the slope rate of the residual-by-lagged-residual plot.
+In our case, the assumption of independent observations and residuals no longer holds due to spatial autocorrelation. We can test this assumption by examining the Moran’s I for the residuals after running an OLS model. Another way to test this assumption is to regress each residual on the average of nearby residuals (or "lagged residuals", "nearby" being defined by the Queen matrix). The coefficient of lagged residuals from this regression is known as $\lambda$ or $\rho$. It is also the slope rate of the residual-by-lagged-residual plot.
 
-Other assumptions required in an OLS regression can be tested.
+In the above process, a few other assumptions required in an OLS regression can be tested as well.
 
 -   Homoscedasticity. We may use the Breusch-Pagan Test, the Koenker-Bassett Test, or the White Test, to test for homoscedasticity. The null hypothesis is that of homoscedasticity. If the p-value is smaller than 0.05, we reject the null hypothesis for the alternative hypothesis of heteroscedasticity.
 
@@ -77,42 +79,46 @@ In this section, we present the models for the spatial lag and spatial error reg
 $$
 md\_housing\_value = \rho W_{md\_housing\_value}+\beta_0+\beta_1\cdot log\_n\_poverty+\beta_2\cdot pct\_bachelor+\beta_3\cdot pct\_single + \beta_4\cdot pct\_vacant+\epsilon
 $$ 
-where $W_{md\_housing\_value}$ is the lagged value of $md\_housing\_value$. For each observation, the lagged value is the weighted mean of the values at the neighboring locations. "Neighboring locations" are determined by a weights matrix. $\rho$ is the coefficient of this lagged variable. Holding all other variables constant, as $W_{md\_housing\_value}$ changes by one unit, the dependent variable will changes by $\rho$ units. Note that here $\rho$ is constrained between -1 and 1.
+
+where $W_{md\_housing\_value}$ is the lagged value of $md\_housing\_value$. For each observation, the lagged value is the weighted mean of the values at the neighboring locations. "Neighboring locations" are determined by a weights matrix. $\rho$ is the coefficient of this lagged variable. Holding all other variables constant, as $W_{md\_housing\_value}$ changes by one unit, the dependent variable will changes by $\rho$ units. Note that here $\rho$ is constrained between -1 and 1. This spatial lag model is estimated through Maximum Likelihood Estimation.
 
 The other variables here are number of households under the poverty line (logged), percentage of residents of with a bachelor's degree or higher, percentage of housing units that are single-family detached, and the percentage of housing units that are vacant. $\beta_1$ to $\beta_4$ are the coefficients of these variables, and $\beta_0$ here is the intercept. Readers may refer to the first assignment for detailed interpretations of these terms. Finally, the $\epsilon$ here stands for the residual, or the difference between the predicted and observed values of the dependent variable.
 
-**The spatial error regression** functions similarly to the spatial lag regression, except for that the term of lagged dependent variable is replaced by lagged residuals $W_\epsilon$. Running a spatial error regression requires a two-step process.
+**The spatial error regression** functions similarly to the spatial lag regression, except for that the term of lagged dependent variable is replaced by lagged residuals $W_\epsilon$. Running a spatial error regression requires a two-step process in theory:
 
 -   Step 1: we run a regular OLS regression without the lagged term. Then, we calculate the residual of each observation.
--   Step 2: we determine how much of the residuals are "spatial". To do this, we regress the residuals on their nearest neighboring residuals and get $\lambda$. With this, we construct the spatial error model by adding the term of $\lambda W_\epsilon$. The model is written as follows:
+-   Step 2: we determine how much of the residuals are "spatial". To do this, we regress the residuals on their nearest neighboring residuals and get $\lambda$. With this, we construct the spatial error model by adding the term of $\lambda W_\epsilon$. Conceptually, the spatial error model is written as follows:
 
 $$
+md\_housing\_value = \beta_0+\beta_1\cdot log\_n\_poverty+\beta_2\cdot pct\_bachelor+\beta_3\cdot pct\_single + \beta_4\cdot pct\_vacant+\epsilon
+$$
+$$
+\epsilon = \lambda W\epsilon + u
+$$
 
-md\_housing\_value = \rho W\_\epsilon+\beta\_0+\beta_1\cdot log\_n\_poverty+\beta_2\cdot pct\_bachelor+\beta_3\cdot pct\_single + \beta_4\cdot pct\_vacant+\epsilon
-
-$$ 
+The first line is written similarly to an OLS model, where $\beta_0$ is the intercept, and $\beta_1$ to $\beta_4$ are the coefficients, and $\epsilon$ is the residual. In the second line, the residual is conceptually split into two parts, one of which is considered “spatial” ($\lambda W\epsilon$). Note that $\lambda$ here is restrained from -1 to 1. The spatial error model is also estimated through the Maximum Likelihood method.
 
 It should be noted that the assumptions needed for the OLS model are still needed for both the spatial lag and spatial error models, except, of course, for the spatial independence of observations. The goal of the spatial lag and spatial error models is to address the possible spatial dependencies nested in the dataset. We expect that the residuals become no longer spatially auto-correlated and less heteroscedastic after taking the lagged terms into account.
 
 After running the spatial lag or spatial error regressions, **model selection** should be performed, which determines whether the spatial lag or spatial error regressions perform better than the OLS regression that the former are based on. We may use the following criteria:
 
--   **Akaike Information Criterion or Schwarz Criterion**. These are measures of the goodness of fit of nested models (where one model is based on the other with a different component or complexity). They measure the information that gets lost when a certain model is used, and therefore describes the "trade-off" between the model's precision and complexity.
+-   **Akaike Information Criterion or Schwarz Criterion**. These are measures of the goodness of fit of nested models (where one model is based on the other with a different component or complexity). By measuring the information that gets lost when a certain model is used, these indices describe the "trade-off" between the model's precision and complexity.
 
--   **Log likelihood** calculate the likelihood of the dataset, given the model parameters. The higher the likelihood, the better the model fits the data. As with the above item, the log likelihood method is also used only with nested models.
+-   **Log likelihood** calculate the likelihood of the dataset as outcome, given a particular set of model parameters. The higher the likelihood, the more “likely” it is to have the dataset as it is, given the model held true, and therefore the better the model fits the data. As with the above item, the log likelihood method is also used only with nested models.
 
 -   **Likelihood Ratio Test** compares the spatial model with the non-spatial OLS model. The null hypothesis is that the spatial model is not better than the non-spatial one. If the p-value is smaller than 0.05, then we may reject the null hypothesis for the alternative hypothesis that the spatial model is better than the non-spatial one given the data.
 
-Another way to compare the models is by checking the Moran's I of the regression residuals. The residuals from the spatial models are expected to have very low spatial depencency, which is an indicator that the spatial models fit the data better.
+Another way to compare the models is by checking the Moran’s I of the regression residuals. The residuals from the spatial models are expected to have very low spatial depencency, which is an indicator that the spatial models fit the data better.
 
 ## 2.4 Geographically Weighted Regression
 
-The **Simpson's Paradox** describes a situation where the modeled relationship between variables may not remain constant; that is, for a selection of observations, the relationship may be different from the one modeled from all the observations. Although the spatial lag and spatial error regression have addressed the problem with spatial dependencies, they still assume **spatial stationarity**, meaning the modeled relationship remains constant across space. It might be beneficial to have **different models** for different spatial locations, i.e., **local regressions**. This process of constructing local regressions for different locations in space is called the **geographically weighted regression (GWR)**.
+The **Simpson's Paradox** describes a situation where the modeled relationship between variables may not remain constant; that is, for a subset of observations, the relationship may be different from the one modeled from all the observations. Although the spatial lag and spatial error regression have addressed the problem with spatial dependencies, they still assume **spatial stationarity**, meaning the modeled relationship remains constant across space. It might be beneficial to have **different models** for different spatial locations, i.e., **local regressions**. This process of constructing local regressions for different locations in space is called the **geographically weighted regression (GWR)**.
 
 The equation for the GWR model is written for each observation $i$:
 
 $$
 
-md\_housing\_value_i = \beta_{i0}+\beta{i1}\cdot log\_n\_poverty_i+\beta_{i2}\cdot pct\_bachelor_i+\beta_{i3}\cdot pct\_single_i+\beta_{i4}\cdot pct\_vacant_i+\epsilon_i
+md\_housing\_value_i = \beta_{i0}+\beta_{i1}\cdot log\_n\_poverty_i+\beta_{i2}\cdot pct\_bachelor_i+\beta_{i3}\cdot pct\_single_i+\beta_{i4}\cdot pct\_vacant_i+\epsilon_i
 
 $$
 
@@ -124,35 +130,321 @@ There are two ways to determine the bandwidth.
 
 -   **Adaptive bandwidth.** A fixed number of nearest neighbors are selected for each local regression, and thus the bandwidth $h$ is adaptive.
 
-Fixed bandwidth is more appropriate when the spatial distribution of the observations are even. Otherwise, the number of observations entering into each local regression may vary greatly. For the sparse places, too few observations enter the local regressions; whereas for the dense places, too many observations enter local regressions that they may no longer be “local” enough. In our case, as block group sizes vary across Philadelphia, we chose to use the adaptive bandwidth.
+Fixed bandwidth is more appropriate when the spatial distribution of the observations are even. Otherwise, the number of observations entering into each local regression may vary greatly. For the sparse places, too few observations enter the local regressions; whereas for the dense places, too many observations enter local regressions that they may no longer be "local" enough. In our case, as block group sizes vary across Philadelphia, we chose to use the adaptive bandwidth.
 
-The assumptions required for a regular OLS regression are still required for the GWR model, including normality of residuals, homoscedasticity, and non-collinearity of predictors. The assumption for non-multicollinearity is worth noting here. As the GWR model builds a local regression for each location, we may run into issues when the values of one of the predictors cluster in space. In that case, this predictor no longer will provide little explanation power in the clustering places. In the same way, we may run into issues when two or more predictors have similar patterns of clusters, which may produce unstable or unreliable results. In R, the **condition number** indicates when a local regression has issues with multicollinearity and therefore may have unreliable coefficients. Conventionally, we do not trust results for local regressions with a condition number greater than 30 or equal to null.
+The assumptions required for a regular OLS regression are still required for the GWR model, including normality of residuals, homoscedasticity, and non-collinearity of predictors. The assumption for non-multicollinearity is worth noting here. As the GWR model builds a local regression for each location, we may run into issues when the values of one of the predictors cluster in space. In that case, this predictor will provide little explanation power in the clustering places. In the same way, we may run into issues when two or more predictors have similar patterns of clusters, which may produce unstable or unreliable results. In R, the **condition number** indicates when a local regression has issues with multicollinearity and therefore may have unreliable coefficients. Conventionally, we do not trust results for local regressions with a condition number greater than 30 or equal to null.
 
-Unlike with OLS regressions, p-values are not part of the GWR output. This is a problem with multiple testing. If the p-value is $\alpha$, it means that under the null hypothesis, there is an $\alpha$ probability that we observe the result by pure chance. If $\alpha$ is reasonably small, then we can reject the null hypothesis. However, this rejection may be the type II error in which we deem something to be significant when it is actually not; after all, even if something is not significant, there is still an $\alpha$ probability of us rejecting the null hypothesis. The problem arises with multiple testing because as the number of tests go up, it becomes almost inevitable to make type II errors, and thus the basic premises of p-value reporting (rejecting the null hypothesis assuming type II errors are not likely) no longer holds. In the GWR model, each predictor in each local regression requires testing. Therefore, we do not usually report p-values in the GWR model.
+Unlike with OLS regressions, p-values are not part of the GWR output. This is a problem with multiple testing. If the p-value is $\alpha$, it means that under the null hypothesis, there is, although unlikely, still an $\alpha$ probability that we observe the result by pure chance. If $\alpha$ is reasonably small, then we can reject the null hypothesis. However, this rejection may turn out to be a type II error in which we deem something to be significant when it is actually not; after all, even if something is not significant, there is still an $\alpha$ probability of us rejecting the null hypothesis. The problem arises with multiple testing because as the number of tests go up, it becomes almost inevitable to make type II errors, and thus the basic premises of p-value reporting (rejecting the null hypothesis assuming type II errors are not likely) no longer holds. In the GWR model, each predictor in each local regression requires testing. Therefore, we do not usually report p-values in the GWR model.
 
 # 3. Results
 
 ```{r import}
 
-df = st_read("data/Regression Data.shp") %>%
+df <-  st_read("data/Regression Data.shp") %>%
   st_transform(crs) %>%
   dplyr::select(bg_id = AREAKEY, # Block Group ID
-                md_housing_value = MEDHVAL, # Median Housing Value (owner-occupied)
+                md_housing_value = MEDHVAL, 
+                md_housing_value_log = LNMEDHVAL,# Median Housing Value (owner-occupied)
                 pct_bachelor = PCTBACHMOR, # Pct of residents w/ bachelor's +
                 pct_vacant = PCTVACANT, # Pct of hs units that are vacant
                 n_poverty = NBelPov100, # Number of hhs below poverty line
                 md_hh_income = MEDHHINC, # Median household income
                 pct_single = PCTSINGLES # Pct of hs units that are single-family detached
-                )
+                ) %>% 
+  mutate(n_poverty_log = log(n_poverty + 1),
+         md_hh_income_log = log(md_hh_income + 1))
 
 # Dictionary of variable names to their meaningful names
-var_dct = c("bg_id" = "Block Group ID",
+var_dict = c("bg_id" = "Block Group ID",
             "md_housing_value" = "Median Housing Value",
+            "md_housing_value_log" = "Logged Median Housing Value",
             "pct_bachelor" = "Pct of Residents w/ Bachelor's Degree +",
             "pct_vacant" = "Pct of Housing Units Being Vacant",
             "n_poverty" = "# of Households under Poverty Line",
             "md_hh_income" = "Median Household Income",
-            "pct_single" = "Pct of Housing Unites Single Family Detached")
+            "pct_single" = "Pct of Housing Unites Single Family Detached",
+            "n_poverty_log" = "Logged number of Households under Poverty Line",
+            "md_hh_income_log" = "Logged Median Household Income")
+
+```
+
+
+
+## 3.1 Spatial Correlation Exploration through Global and Local Moran's I
+
+- plot continuous queen neighbors unfinished
+
+```{r queen-neighbors}
+
+# create the queen weight dataframe
+queen<-poly2nb(df, row.names=df$bg_id)
+summary(queen)
+
+```
+
+The above summary shows that, fortunately, every block group in our dataset has at least one queen neighbor.
+
+Question: are all these about queen neighbors necessary?
+
+```{r queen-plots}
+
+# plot continuous queen neighbors
+plot(df %>% dplyr::select(bg_id), col='grey90', lwd=2)
+xy<-coordinates(as_Spatial(df))
+par(mfrow=c(1,1)) 
+plot(queen, xy, col='red', lwd=10, add=TRUE)
+title(main='Contiguous Queen Neighbors')
+```
+
+```{r}
+
+#see which region has only one neighbor
+smallestnbcard<-card(queen) #extract neighbor matrix
+smallestnb<-which(smallestnbcard == min(smallestnbcard)) #extract block groups with smallest number of neighbors
+fg<-rep('grey90', length(smallestnbcard))
+fg[smallestnb]<-'red' #color block groups red
+fg[queen[[smallestnb[1]]]]<-'green' #color neighboring blocks green
+fg[queen[[smallestnb[2]]]]<-'green'
+fg[queen[[smallestnb[3]]]]<-'green'
+fg[queen[[smallestnb[4]]]]<-'green'
+plot(df %>% dplyr::select(bg_id), col=fg)
+title(main='Regions with only 1 neighbor')
+
+#see which region has most neighbors
+largestnbcard<-card(queen)
+largestnb<-which(largestnbcard == max(largestnbcard))
+fg1<-rep('grey90', length(largestnbcard))
+fg1[largestnb]<-'red'
+fg1[queen[[largestnb]]]<-'green'
+plot(df %>% dplyr::select(bg_id), col=fg1)
+title(main='Region with 27 neighbors')
+
+```
+Global Moran's I is 0.6814 - which suggests a strong spatial correlation
+
+```{r global-morans}
+
+# Generalist the queen list for moran's I
+queenlist<-nb2listw(queen, style = 'W')
+# calculate Global Moran'I
+morans_i = moran(df$md_housing_value, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I` 
+
+# Then check to see whether the Moran’s I value is significant (using 999 permutations).
+
+moranMC<-moran.mc(df$md_housing_value, queenlist, nsim=999, alternative="two.sided")  #We use 999 permutations
+
+# Plot the hypothetical Moran's Is under the 999 permutations and plot the observed moran's I
+
+ggplot(as.data.frame(moranMC$res[c(1:999)]), aes(moranMC$res[c(1:999)])) +
+  geom_histogram(binwidth = 0.002, fill = palette_hero_faded) +
+  # Observed Moran's I
+  geom_vline(aes(xintercept = morans_i), color = palette_hero, size = 1) +
+  labs(x="Moran's I under 999 permutations", y="Count", title = "Permutated and Observed Moran's I") +
+  annotate("text", x=0.58, y=10, label = "Observed\nMoran's I:\n" %>% paste0(morans_i %>% round(2)),
+           hjust = 0) +
+  plot_theme()
+
+```
+
+```{r local-morans, message=FALSE}
+
+#Run local moran's I (LISA) 
+LISA<-localmoran(df$md_housing_value, queenlist)
+head(LISA)
+
+df.LISA <-cbind(df, as.data.frame(LISA))
+
+# map the p-value districution
+moranSig.plot<-function(df,listw, title){
+  local<-localmoran(x=df$md_housing_value, listw=listw, zero.policy = FALSE)
+  moran.map<-cbind(df, local)
+  #Here, col='Pr.z....E.Ii..' is the name of the column in the dataframe df.LISA that we're trying to plot. This variable name might change based on the version of the package.
+  tm<-tm_shape(moran.map)+
+    tm_borders(col='white')+
+    tm_fill(style='fixed', col='Pr.z....E.Ii..', breaks=c(0,0.001, 0.01, 0.05, 1), title= 'p-value', palette = '-BuPu')+
+    tm_layout(frame = FALSE, title = title)
+  print(tm)
+}
+moranSig.plot(df.LISA, queenlist, 'p-value')
+
+
+# categorized p-value map
+hl.plot<-function(df, listw){
+  local<-localmoran(x=df$md_housing_value, listw=listw, zero.policy = FALSE)
+  quadrant<-vector(mode='numeric', length=323)
+  m.prop<-df$md_housing_value - mean(df$md_housing_value)
+  m.local<-local[,1]-mean(local[,1])
+  signif<-0.05
+  quadrant[m.prop >0 & m.local>0]<-4 #high md_housing_value, high clustering
+  quadrant[m.prop <0 & m.local<0]<-1 #low md_housing_value, low clustering
+  quadrant[m.prop <0 & m.local>0]<-2 #low md_housing_value, high clustering
+  quadrant[m.prop >0 & m.local<0]<-3 #high md_housing_value, low clustering
+  quadrant[local[,5]>signif]<-0
+  
+  brks <- c(0,1,2,3,4)
+  colors <- c("grey","light blue",'blue','pink',"red")
+  plot<-plot(df %>% dplyr::select(bg_id),border="gray90",lwd=1.0,col=colors[findInterval(quadrant,brks,all.inside=FALSE)])
+}
+
+hl.plot(df, queenlist)
+legend("bottomright",legend=c("insignificant","low-high","low-low","high-low","high-high"),
+       fill=c("grey", "light blue", "blue", "pink", "red"),bty="n", cex = 0.5)
+
+```
+
+## 3.2 OLS Regression
+
+
+## 3.3 Spatial Lag and Spatial Error Regression Results
+
+
+## 3.4 Geographically Weighted Regression (GWR)
+
+```{r gwr_bandwidth}
+
+library(spgwr)
+
+#Setting an adaptive bandwidth
+bw<-gwr.sel(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant, 
+            data=as_Spatial(df),
+            method = "aic",
+            adapt = TRUE)
+
+bw
+
+# create a fixed bandwidth
+bw_fixed<-gwr.sel(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant,  
+            data=as_Spatial(df),
+            method = "aic",
+            adapt = FALSE)
+
+bw_fixed
+
+```
+
+```{r gwr_model}
+
+# gwr model with adpative bandwidth
+gwrmodel<-gwr(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant,
+              data= as_Spatial(df),
+              adapt = bw, #adaptive bandwidth determined by proportion of observations accounted for
+              gweight=gwr.Gauss,
+              se.fit=TRUE, #to return local standard errors
+              hatmatrix = TRUE)
+gwrmodel
+
+
+# gwr model with fixed bandwidth
+gwrmodel_fixed<-gwr(formula=md_housing_value_log~n_poverty_log + pct_bachelor +
+              pct_single + pct_vacant,
+              data= as_Spatial(df),
+              adapt = bw_fixed, #adaptive bandwidth determined by proportion of observations accounted for
+              gweight=gwr.Gauss,
+              se.fit=TRUE, #to return local standard errors
+              hatmatrix = TRUE)
+gwrmodel_fixed
+
+```
+
+```{r gwr_adpative_summary}
+
+summary(gwrmodel$SDF)
+
+```
+
+```{r gwr_mapping}
+
+gwrresults<-as.data.frame(gwrmodel$SDF)
+
+df <- df %>% 
+  mutate(coef_n_poverty_log_st = gwrresults$n_poverty_log/gwrresults$n_poverty_log_se,
+         coef_pct_vacant_st = gwrresults$pct_vacant / gwrresults$pct_vacant_se,
+         coef_pct_bachelor_st = gwrresults$pct_bachelor / gwrresults$pct_bachelor_se,
+         coef_pct_single_st = gwrresults$pct_single/gwrresults$pct_single_se,
+         gwrE = gwrresults$gwr.e,
+         localR2 = gwrresults$localR2)
+
+# plotting
+coef_n_poverty_log<-tm_shape(df)+
+  tm_fill(col='coef_n_poverty_log_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of n_poverty_log', 
+          palette ='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Number of Poverty (Log)')
+
+coef_pct_vacant<-tm_shape(df)+
+  tm_fill(col='coef_pct_vacant_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of pct_vacant', 
+          palette='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percentage of Housing Vacant')
+
+coef_pct_bachelor<-tm_shape(df)+
+  tm_fill(col='coef_pct_bachelor_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of pct_bachelor', 
+          palette ='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percentage of bachelor degree or more')
+
+coef_pct_single<-tm_shape(df)+
+  tm_fill(col='coef_pct_single_st', breaks=c(-Inf, -6, -4, -2, 0, 2, 4, 6, Inf), title='Standardized coefficient of pct_single', 
+          palette ='-RdBu')+
+  tm_layout(frame=FALSE, title = 'Percentage of single family housing')
+
+plot_list <-  list(coef_n_poverty_log, coef_pct_bachelor, coef_pct_single, coef_pct_vacant)
+
+tmap_arrange(plot_list,  ncol=2)
+
+```
+
+```{r gwr_ggplot}
+
+# All the variables for the maps
+choropleth_var_list = c("coef_n_poverty_log_st", "coef_pct_vacant_st", "coef_pct_single_st",
+                        "coef_pct_bachelor_st")
+
+# # Create a list of the real names
+# choropleth_name_list = c()
+# for(var in choropleth_var_list){
+#   if(substring(var, nchar(var) - 6, nchar(var)) == "_log_st"){
+#     choropleth_name_list = c(choropleth_name_list, 
+#                              paste0("Log ",
+#                                     var_dict[substring(var, 1, nchar(var) - 4)]))
+#   } else {
+#     choropleth_name_list = c(choropleth_name_list, 
+#                              paste0(var_dict[var]))
+#   }
+# }
+
+choropleth_name_list <- c()
+for (var in choropleth_var_list) {
+  var_short <- gsub("coef_", "", var)
+  var_short <- gsub("_st","", var_short)
+  choropleth_name_list = c(choropleth_name_list, paste0(var_dict[var_short]))
+}
+
+# Initialize map list
+map_list <-  list()
+
+# Make a long table
+df_long <-  df %>%
+  dplyr::select(bg_id, choropleth_var_list) %>%
+  gather("Legend", "Value", -bg_id, -geometry)
+
+# Make the plots
+for(i in seq(1,length(choropleth_var_list))){
+  var = choropleth_var_list[i]
+  this_sf = df_long %>% filter(., Legend == var)
+  map_list[[var]] = 
+    ggplot(this_sf) +
+    geom_sf(aes(fill = Value), color = NA) +
+    scale_fill_continuous(type = "viridis",
+                      #labels = to_jenks_labels(this_df$Value, 5),
+                      breaks = c(-6, -4, -2, 0, 2, 4, 6),
+                      name = "") +
+    labs(title = choropleth_name_list[i]) +
+    map_theme(title_size = 9, tick_size = 7) +
+    theme(legend.position = c(0.8, 0.25))
+}
+
+do.call(grid.arrange, c(map_list, ncol = 2, top = "Choropleth Maps"))
 
 ```
 

@@ -433,9 +433,11 @@ ggplot(as.data.frame(moran_res$res[c(1:999)]), aes(moran_res$res[c(1:999)])) +
 
 ## 3.3 Spatial Lag Regression
 
-Next, lets go into the spatial lag and spatial error regression models. The model summary is presented below:
+### (a) Model summary
 
-```{r}
+A step further from the OLS model, next we used the spatial lag model, which takes the "lagged" dependent variable, or values of (queen) neighbor observations, into the equation and uses the Maximum Likehood Estimation method to estimate the coefficients. The summary of the spatial lag model is presented below.
+
+```{r spatial-lag-model, warning=FALSE}
 
 lag_reg = lagsarlm(md_housing_value_log ~ pct_vacant + pct_single 
                    + pct_bachelor + n_poverty_log,
@@ -445,35 +447,40 @@ lag_reg = lagsarlm(md_housing_value_log ~ pct_vacant + pct_single
 summary(lag_reg)
 ```
 
-The summary shows that the estimate for $\rho$ is 0.65, and it is significant with a p-value very close to zero. This coefficient means that, holding all other variables constant, one unit of increase in the logged median housing values of queen-neighboring block groups is correlated with around 0.65 unit of increase in log median housing values.
+The summary shows that the coefficient of the spatial term, $\rho$, is 0.65, and it is significant with a p-value very close to zero. This coefficient means that, holding all other variables constant, one unit of increase in the logged median housing values of queen-neighboring block groups is correlated with around 0.65 unit of increase in log median housing values.
 
-Apart from the spatial lag term, the other terms in the model remain significant with p-values all smaller than 0.01. Compared to the OLS model, all the non-spatial terms now have smaller coefficients, meaning that, according to the spatial-lag model, one unit of change in those predictors is correlated with a smaller change in median housing value. This indicates that the spatial lag term already explained a considerable portion of the variance of median housing value.
+Apart from the spatial lag term, the other terms in the model remain significant with p-values all smaller than 0.01. However, compared to the OLS model, all the non-spatial terms now have smaller coefficients and slightly higher p-values, meaning that, taking spatial auto-correlation into account, one unit of change in those predictors is correlated with a smaller change in median housing value. This indicates that the spatial lag term already explained a considerable portion of the variance of median housing value.
 
+### (b) Tests on heteroscedasticity and the normality of errors
 
-```{r}
+Let's perform the same tests on heteroscedasticity and the normality of errors as in Section 3.1. The Breusch-Pagan and Koenker-Bassett Tests below show that the spatial lag model still faces problems with heteroscedasticity, as the p-values are smaller than 0.05 for us to reject the null hypothesis of homoscedasticity.
+
+```{r lag-model-bptest, warning=FALSE}
+library(spatialreg)
 bptest.sarlm(lag_reg, studentize = FALSE)
 ```
 
-```{r}
+```{r lag-model-kbtest, warning=FALSE}
 bptest.sarlm(lag_reg, studentize = TRUE)
 ```
 
-The Breusch-Pagan test and Koenker-Bassett test above show that the spatial lag model still faces the problem of heteroscedasticity, as both p-values are lower than the 0.05 threshold.
+### (c) Goodness-of-fit comparison with the OLS model
 
+Now, let's compare the spatial lag model with the original OLS model in terms of goodness of fit. According the model summary above, the Akaike Information Criterion for the spatial lag model is 525.48, lower than the AIC for the OLS model, which is 1435. This indicates that the spatial lag model is a better fit for the data. In terms of log likelihood, the below summary shows that the OLS model produced a log likelihood of -711, where the spatial lag model had a log likelihood of -255. The likelihood ratio test produced a p-value close to zero, also indicating that the spatial lag model fits the data better.
 
-```{r}
+```{r lag-model-log-likelihood-compare, warning=FALSE}
 
 LR.sarlm(lag_reg, fit)
 
 ```
 
-Let's compare the spatial lag model with the original OLS model in terms of goodness of fit. The Akaike Information Criterion for the spatial lag model is 525.48, lower than the AIC for the OLS model, which is 1435. This indicates that the spatial lag model is a better fit for the data. In terms of log likelihood, the OLS model produced a log likelihood of -711, where the spatial lag model had a log likelihood of -255. The likelihood ratio test produced a p-value close to zero, also indicating that the spatial lag model fits the data better.
+### (d) Moran’s I scatterplot
 
+Below, we produced a Moran’s I scatter plot of the residuals of the spatial lag model (residuals by lagged residuals of queen neighbors). The plot shows that the “slope” of the plot is negative and close to zero, meaning that the residuals are no longer spatially clustered, meaning much of the spatial auto-correlation is already accounted for in this model.
 
-```{r}
+```{r lag-model-morans-scatterplot, fig.cap="Fig.6"}
 
 residuals = lag_reg$residuals %>% scale(.)
-
 residuals_lag = lag.listw(queenlist, residuals)
 
 cbind(residuals, residuals_lag) %>%
@@ -484,10 +491,12 @@ cbind(residuals, residuals_lag) %>%
   labs(x="Lagged residuals", y="Standardized residuals") +
   plot_theme()
 
-
 ```
 
-By plotting the residuals against lagged residuals, we can identify no spatial autocorrelation of the residuals anymore.
+Based on all the criteria above, we were able to state that the spatial lag model performed better in fitting the data.
+
+## 3.4 Spatial Error Regression
+
 
 
 ## 3.5 Geographically Weighted Regression (GWR)

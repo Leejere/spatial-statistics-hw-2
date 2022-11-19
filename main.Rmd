@@ -227,7 +227,11 @@ Global Moran's I is 0.6814 - which suggests a strong spatial correlation
 # Generalist the queen list for moran's I
 queenlist<-nb2listw(queen, style = 'W')
 # calculate Global Moran'I
-morans_i = moran(df$md_housing_value, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I` 
+morans_i = moran(df$md_housing_value, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I`
+
+```
+
+```{r}
 
 # Then check to see whether the Moran’s I value is significant (using 999 permutations). Take a screenshot of your results to presentin your report (Moran’s I value for the sample, histogram of Moran’s I values forthe permutations, and the p-value that you obtain will need to be included).
 
@@ -243,6 +247,10 @@ ggplot(as.data.frame(moranMC$res[c(1:999)]), aes(moranMC$res[c(1:999)])) +
            hjust = 0) +
   plot_theme()
 
+```
+
+```{r}
+
 #Create Moran plot (lagged value against observed value)
 df$lag_housing_value = lag.listw(queenlist, df$md_housing_value)
 
@@ -252,59 +260,157 @@ ggplot(df, aes(x=md_housing_value, y=lag_housing_value)) +
   labs(x="Median Housing Value", y="Lagged Median Housing Value (Queen)",
        title="Median Housing Value Is Highly Spatially Autocorrelated") +
   plot_theme()
+
 ```
 
 ```{r local-morans, message=FALSE}
 
 #Run local moran's I (LISA) 
 LISA<-localmoran(df$md_housing_value, queenlist)
-head(LISA)
 
+# Resulting an sf stating Local Moran's Is
 df.LISA <-cbind(df, as.data.frame(LISA))
-
-# map the p-value districution
-moranSig.plot<-function(df,listw, title){
-  local<-localmoran(x=df$md_housing_value, listw=listw, zero.policy = FALSE)
-  moran.map<-cbind(df, local)
-  #Here, col='Pr.z....E.Ii..' is the name of the column in the dataframe df.LISA that we're trying to plot. This variable name might change based on the version of the package.
-  tm<-tm_shape(moran.map)+
-    tm_borders(col='white')+
-    tm_fill(style='fixed', col='Pr.z....E.Ii..', breaks=c(0,0.001, 0.01, 0.05, 1), title= 'p-value', palette = '-BuPu')+
-    tm_layout(frame = FALSE, title = title)
-  print(tm)
-}
-moranSig.plot(df.LISA, queenlist, 'p-value')
-
-
-# categorized p-value map
-hl.plot<-function(df, listw){
-  local<-localmoran(x=df$md_housing_value, listw=listw, zero.policy = FALSE)
-  quadrant<-vector(mode='numeric', length=323)
-  m.prop<-df$md_housing_value - mean(df$md_housing_value)
-  m.local<-local[,1]-mean(local[,1])
-  signif<-0.05
-  quadrant[m.prop >0 & m.local>0]<-4 #high md_housing_value, high clustering
-  quadrant[m.prop <0 & m.local<0]<-1 #low md_housing_value, low clustering
-  quadrant[m.prop <0 & m.local>0]<-2 #low md_housing_value, high clustering
-  quadrant[m.prop >0 & m.local<0]<-3 #high md_housing_value, low clustering
-  quadrant[local[,5]>signif]<-0
-  
-  brks <- c(0,1,2,3,4)
-  colors <- c("grey","light blue",'blue','pink',"red")
-  plot<-plot(df %>% dplyr::select(bg_id),border="gray90",lwd=1.0,col=colors[findInterval(quadrant,brks,all.inside=FALSE)])
-}
-
-hl.plot(df, queenlist)
-legend("bottomright",legend=c("insignificant","low-high","low-low","high-low","high-high"),
-       fill=c("grey", "light blue", "blue", "pink", "red"),bty="n", cex = 0.5)
 
 ```
 
-## 3.2 OLS Regression
+```{r}
 
+# map the p-value districution
+df.LISA = df.LISA %>%
+  mutate(p_value =
+           case_when(Pr.z....E.Ii.. < 0.001 ~ "0.000 to 0.001",
+                     Pr.z....E.Ii.. < 0.010 ~ "0.001 to 0.010",
+                     Pr.z....E.Ii.. < 0.050 ~ "0.010 to 0.050",
+                     TRUE ~ "0.050 to 1.000"),
+         p_value = factor(p_value,
+                          levels = c("0.000 to 0.001",
+                                     "0.001 to 0.010",
+                                     "0.010 to 0.050",
+                                     "0.050 to 1.000")))
+
+df.LISA %>%
+  ggplot(aes(fill=p_value)) +
+  geom_sf(color="#FFFFFF", size=0.2) +
+  scale_fill_manual(values=c(palette_hero, palette_hero_faded, palette_water, "#dddddd"),
+                    name = "P-Value") +
+  map_theme()
+
+```
+
+```{r}
+
+# categorized p-value map
+
+mean_value = mean(df$md_housing_value, na.rm=TRUE)
+mean_lisa = mean(LISA[,1], na.rm=TRUE)
+
+df.LISA = df.LISA %>%
+  mutate(category =
+           case_when(Pr.z....E.Ii.. > 0.05 ~ "Insignificant",
+                     md_housing_value >= mean_value & Ii >= mean_lisa ~ "High-High",
+                     md_housing_value >= mean_value & Ii < mean_lisa ~ "High-Low",
+                     md_housing_value < mean_value & Ii >= mean_lisa ~ "Low-High",
+                     TRUE ~ "Low-Low"),
+         category = factor(category,
+                           levels = c("High-High", "High-Low", "Low-High", "Low-Low", "Insignificant")))
+
+df.LISA %>%
+  ggplot(aes(fill = category)) +
+  geom_sf(color="#FFFFFF", size=0.2) +
+  scale_fill_manual(values = c(palette_primary, palette_primary_faded,
+                               palette_hero, palette_hero_faded,
+                               "#dddddd"),
+                    name = "Categories") +
+  map_theme()
+
+```
+
+## 3.2 Review of the OLS Regression
+
+### (a) The OLS model
+
+Before diving into spatial regressions, let's have a quick review of the OLS regression.
+
+```{r}
+fit <- lm(md_housing_value_log ~ pct_vacant + pct_single 
+          + pct_bachelor + n_poverty_log,
+          data = df %>% st_drop_geometry())
+summary(fit)
+```
+About 66% of the variance in the dependent variable ($md_housing_value$) was explained by the model ($R^2$ is 0.6623 and Adjusted $R^2$ is 0.6615). The low p-value for F-test (p \< 0.0001) suggests that we can reject the null hypothesis that all coefficients in the model are 0.
+
+All predictors used in this regression are highly significant ($p<0.0001$for all variables). The percentage of single house units($pct\_single$) and the percentage of individuals with bachelor's degree or higher($pct\_bachelor$) are positively associated with logged median household value, while the percentage of vacant houses($pct\_vacant$) and the logged number of households living in poverty($hh\_poverty\_log$) are negatively associated with logged median household value.
+
+### (b) Tests for heteroscedasticity and the normality of errors
+
+**Tests on heteroscedasticity.** Here, we used the Breusch-Pagan Test, the Koenker-Bassett Test, and the White Test, to test for homo- or heteroscedasticity of the above OLS model.
+
+```{r}
+
+library(lmtest)
+# Breusch-Pagan Test
+bptest(fit, studentize=FALSE)
+
+```
+```{r}
+
+# Koenker-Bassett Test
+bptest(fit, studentize=TRUE)
+
+```
+
+```{r}
+library(whitestrap)
+# White test
+white_test(fit)
+
+```
+
+The three tests on heteroscedasticity are consistent in that they indicate there is heteroscedasticity with the OLS regression model.
+
+**Normality of errors.** We used the Jarque-Bera test to test whether the errors of the model are normally distributed.
+
+```{r}
+
+library(tseries)
+jarque.bera.test(fit$residuals)
+
+```
+
+As the p-value goes down to near-zero, we rejected the null hypothesis of the normality of error for the alternative hypothesis of non-normality.
+
+### (c) Spatial autocorrelation of residuals
+
+By regressing the standardized OLS residuals on the spatial lag of residuals (OLS residuals of the queen neighbors), the $\beta$ coefficient\
+
+```{r}
+
+# First standardize the OLS regression residuals
+res_standardized = rstandard(fit)
+
+# Then get the lagged residuals
+res_lag = lag.listw(queenlist, res_standardized)
+
+# Plot
+cbind(res_standardized, res_lag) %>%
+  as.data.frame() %>%
+  ggplot(aes(x=res_lag, y=res_standardized)) +
+  geom_point(color=palette_hero_faded, size=1) +
+  geom_smooth(method="lm", color=palette_hero) +
+  labs(x="Lagged residuals", y="Standardized residuals") +
+  plot_theme()
+
+```
+```{r}
+res_fit = lm(res_standardized ~ res_lag)
+summary(res_fit)
+```
+
+From the plot and the regression results, we identified strong spatial autocorrelation of the residuals. The coefficient of standardized residuals reached 0.73, and the p-value was near zero. 
 
 ## 3.3 Spatial Lag and Spatial Error Regression Results
 
+Next, lets go into the spatial lag and spatial error regression models.
 
 ## 3.4 Geographically Weighted Regression (GWR)
 

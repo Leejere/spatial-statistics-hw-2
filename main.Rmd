@@ -229,12 +229,11 @@ queenlist<-nb2listw(queen, style = 'W')
 # calculate Global Moran'I
 morans_i = moran(df$md_housing_value, queenlist, n=length(queenlist$neighbours), S0=Szero(queenlist))$`I` 
 
-# Then check to see whether the Moran’s I value is significant (using 999 permutations).
+# Then check to see whether the Moran’s I value is significant (using 999 permutations). Take a screenshot of your results to presentin your report (Moran’s I value for the sample, histogram of Moran’s I values forthe permutations, and the p-value that you obtain will need to be included).
 
 moranMC<-moran.mc(df$md_housing_value, queenlist, nsim=999, alternative="two.sided")  #We use 999 permutations
 
 # Plot the hypothetical Moran's Is under the 999 permutations and plot the observed moran's I
-
 ggplot(as.data.frame(moranMC$res[c(1:999)]), aes(moranMC$res[c(1:999)])) +
   geom_histogram(binwidth = 0.002, fill = palette_hero_faded) +
   # Observed Moran's I
@@ -244,6 +243,15 @@ ggplot(as.data.frame(moranMC$res[c(1:999)]), aes(moranMC$res[c(1:999)])) +
            hjust = 0) +
   plot_theme()
 
+#Create Moran plot (lagged value against observed value)
+df$lag_housing_value = lag.listw(queenlist, df$md_housing_value)
+
+ggplot(df, aes(x=md_housing_value, y=lag_housing_value)) +
+  geom_point(color=palette_hero_faded, size=0.5) +
+  geom_smooth(method = "lm", color=palette_hero) +
+  labs(x="Median Housing Value", y="Lagged Median Housing Value (Queen)",
+       title="Median Housing Value Is Highly Spatially Autocorrelated") +
+  plot_theme()
 ```
 
 ```{r local-morans, message=FALSE}

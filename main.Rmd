@@ -439,6 +439,8 @@ A step further from the OLS model, next we used the spatial lag model, which tak
 
 ```{r spatial-lag-model, warning=FALSE}
 
+library(spatialreg)
+
 lag_reg = lagsarlm(md_housing_value_log ~ pct_vacant + pct_single 
                    + pct_bachelor + n_poverty_log,
                    data = df %>% st_drop_geometry(),
@@ -457,11 +459,11 @@ Let's perform the same tests on heteroscedasticity and the normality of errors a
 
 ```{r lag-model-bptest, warning=FALSE}
 library(spatialreg)
-bptest.sarlm(lag_reg, studentize = FALSE)
+bptest.Sarlm(lag_reg, studentize = FALSE)
 ```
 
 ```{r lag-model-kbtest, warning=FALSE}
-bptest.sarlm(lag_reg, studentize = TRUE)
+bptest.Sarlm(lag_reg, studentize = TRUE)
 ```
 
 ### (c) Goodness-of-fit comparison with the OLS model
@@ -470,7 +472,7 @@ Now, let's compare the spatial lag model with the original OLS model in terms of
 
 ```{r lag-model-log-likelihood-compare, warning=FALSE}
 
-LR.sarlm(lag_reg, fit)
+LR.Sarlm(lag_reg, fit)
 
 ```
 

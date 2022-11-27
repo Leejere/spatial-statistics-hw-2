@@ -7,9 +7,13 @@ output:
     toc: yes
     toc_float: yes
     code_folding: hide
-    theme: paper
+    theme: journal
     fig_caption: yes
   pdf_document: default
+monofont: Hack
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
 
 <link rel="stylesheet" href="css/styles.css">
@@ -28,11 +32,9 @@ library(tmap)
 
 # 1. Introduction
 
-*Two paragraphs*
-
 Home value prediction has been frequently explored in the field and industry of spatial statistics. In the previous assignment, we used the Ordinary Least Squares method to examine the relationship between median housing values and several neighborhood characteristics in Philadelphia using block-group-level data from the American Community Survey. The dependent variable was Median Housing Value by block group, and we explored predictors such as the percentage of residents with a bachelor's degree or higher, percentage of detached single-family housing, percentage of vacant units, and percentage of households under the poverty line.
 
-Although the OLS model possessed reasonably high explaining power, it violated several assumptions required for an OLS model and faced limitations. Rather than being independent from each other, the observations tended to be spatially auto-correlated, and the model residuals were geographically nested rather than random. This meant that the *geographical location* itself was an important predictor of housing value, which was omitted in the OLS model. In this assignment, we built on top of the OLS model and used three *spatial* regression models, namely the *spatial lag*, *spatial error*, and the *geographically weighted* regression models.
+Although the OLS model possessed reasonably high explaining power, it violated several assumptions required of an OLS model and faced limitations. Rather than being independent from each other, the observations tended to be spatially auto-correlated, and the model residuals were geographically nested rather than random. This meant that the *geographical location* itself was an important predictor of housing value, which was omitted in the OLS model. In this assignment, we built on top of the OLS model and used three *spatial* regression models, namely the *spatial lag*, *spatial error*, and the *geographically weighted* regression models.
 
 # 2. Methods
 
